@@ -1,0 +1,289 @@
+---
+title: "CS 422"
+output: 
+  html_notebook:
+    toc: yes
+    toc_float: yes
+author: Karan Bhatiya
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+## Homework 3
+### Due Date: saturday, November 11, 2018 11:59:59 PM Chicago Time
+
+```{r}
+install.packages("factoextra")
+install.packages("ggplot2")
+install.packages("dplyr")
+library(cluster)
+library(factoextra)
+library(dplyr)
+```
+##Part 2.1 Problem 1: K-means clustering
+##(a) Data cleanup
+###Part 2.1-(a)-i
+```{r}
+#The "Name" attribute should be removed before clustering, because it is a nominal attribute, unique for each data object, thus no help for clustering.
+```
+
+###Part 2.1-(a)-ii
+```{r}
+#Yes. Standardization can help avoid letting an attribute with large values dominate the results of the calculation, it is usually necessary in data preprocessing.In our Mammals.csv, "C" and "c" has values in the range of 0-1 where as other attributes have values in the range of 0-5 .So scalingg is required to get better results.
+```
+
+###Part 2.1-(a)-iii
+```{r}
+set.seed(1122)
+getwd()
+mammals <- read.csv("Mammal.csv", header=T, sep = ",",row.names = 1)
+mammals
+```
+##(b) Clustering
+###Part 2.1-(b)-i
+```{r}
+#standarization
+mammals <- scale(mammals,center = TRUE, scale = TRUE)
+#determine optimal clusters
+fviz_nbclust(mammals, kmeans, method="wss")
+fviz_nbclust(mammals, kmeans, method="silhouette")
+#So 8 clusters would be optimal.
+```
+###Part 2.1-(b)-ii
+```{r}
+centers <- 8
+km_result <- kmeans(mammals,centers,nstart = 10)
+#visualize kmeans
+fviz_cluster(km_result,mammals, repel=TRUE, pointsize = 1.5, labelsize = 8)
+```
+###Part 2.1-(b)-iii
+```{r}
+cat(paste(" Observations in each cluster are" , km_result['size']))
+```
+###Part 2.1-(b)-iv
+```{r}
+cat(paste("The total SSE of the clusters" , km_result$totss))
+```
+###Part 2.1-(b)-v
+```{r}
+cat(paste("\nThe SSE of the each clusters" , km_result$withinss))
+```
+
+###Part 2.1-(b)-vi
+```{r}
+for (i in 1:8){
+  print(paste("Cluster", i))
+  mam = which(km_result$cluster==i)
+  print(mam)
+}
+#The clustering make sense. It group animals with similar tooth pattern.The algorithm correctly group all the water mammals in one cluster as welll as the mammals which found in the trees also grouped in one cluster.
+```
+##Problem 2: Hierarchical clustering 
+```{r}
+mammals <- read.csv("Mammal.csv", header=T, sep = ",",row.names = 1)
+set.seed(1122)
+mammals.df <- data.frame(mammals)
+mammals_subset <- sample_n(mammals.df, size = 35)
+mammals_subset
+```
+###Part 2.2-(a)
+```{r}
+mammals.single <- eclust(mammals_subset,"hclust", hc_method = "single")
+plot(mammals.single,main = "Cluster Dendrogram for Single Method", col ="orange")
+mammals.complete <- eclust(mammals_subset,"hclust", hc_method = "complete")
+plot(mammals.complete,main = "Cluster Dendrogram for Complete Method", col ="blue")
+mammals.average <- eclust(mammals_subset,"hclust", hc_method = "average")
+plot(mammals.average,main = "Cluster Dendrogram for Average Method", col ="green")
+```
+###Part 2.2-(b)
+```{r}
+#For Single Link: {SilverHairBat, LumpNoseBat} {Badger, Skunk} {Ocelot, Jaguar} {Elk, Reindeer} {Groundhog, PrairieDog}
+
+#For Complete Link: {SilverHairBat, LumpNoseBat} {HoaryBat, PigmyBat} {Elk, Reindeer} {Raccoon, StarNoseMole} {Badger, Skunk} {Ocelot,Jaguar} {SeaLion, ElephantSeal} {Groundhog, PrairieDog}
+
+#For Average Link: {HoaryBat, PigmyBat} {SilverHairBat, LumpNoseBat} {Elk, Reindeer} {Badger, Skunk} {Ocelot,Jaguar} {SeaLion, ElephantSeal} {Raccoon, StarNoseMole} {Groundhog, PrairieDog}
+```
+
+###Part 2.2-(c)
+```{r}
+#As per the definition of purity, we considered Single Link Method as pure because it has less number of two-singleton clusters i.e.(5).
+```
+
+###Part 2.2-(d)
+```{r}
+clusters <- cutree(mammals.single, h=2)
+cat(paste("Total number of Clusters when we draw line at height h = 2 are") ,max(clusters))
+```
+
+###Part 2.2-(e)
+```{r}
+c.single <- eclust(mammals_subset,"hclust", k = max(clusters), hc_method = "single")
+plot(c.single, main = "Cluster Dendrogram for Single Method", col = "orange")
+
+c.complete <- eclust(mammals_subset, "hclust", k = max(clusters), hc_method = "complete")
+plot(c.complete, main = "Cluster Dendrogram for Complete Method", col = "blue")
+
+c.average <- eclust(mammals_subset, "hclust", k = max(clusters), hc_method = "average")
+plot(c.average, main = "Cluster Dendrogram for Average Method", col = "green")
+```
+
+###Part 2.2-(f)
+```{r}
+stats_single <- fpc::cluster.stats(dist(mammals_subset), cutree(mammals.single, k=max(clusters)))
+cat(paste("\nSingle Link Dunn Index is:", stats_single['dunn']))
+cat(paste("\nSingle Link Silhouette width is:", stats_single['avg.silwidth']))
+
+stats_complete <- fpc::cluster.stats(dist(mammals_subset), cutree(mammals.complete, k=max(clusters)))
+cat(paste("\nComplete Link Dunn Index is:", stats_complete['dunn']))
+cat(paste("\nComplete Link Silhouette width is:", stats_complete['avg.silwidth']))
+
+stats_average <- fpc::cluster.stats(dist(mammals_subset), cutree(mammals.average, k=max(clusters)))
+cat(paste("\nAverage Link Dunn Index is:", stats_average['dunn']))
+cat(paste("\nAverage Link Silhouette width is:", stats_average['avg.silwidth']))
+```
+
+###Part 2.2-(g)
+```{r}
+# Single linkage strategy is the best one as measured by Dunn and Silhouette as compared to others. Because, Single linkage method has higher values for Dunn and Silhouette width as compaed to others.
+```
+
+##Problem 3: K-Means and PCA
+###Part 2.3
+```{r}
+set.seed(1122)
+options("digits"=4)
+getwd()
+htru <- read.csv("HTRU_2-small.csv", header=T, sep = ",")
+htru_pca <- prcomp(htru[,1:8], center = TRUE, scale. = TRUE)
+```
+###Part 2.3-(a)-i
+```{r}
+summary(htru_pca)
+#The cumulative proportion exxplained by the first two component is: 0.785 i.e. 78.5%
+```
+
+###Part 2.3-(a)-ii
+```{r}
+install.packages("ggfortify")
+library(ggfortify)
+library(ggplot2)
+mycolor <- c('red','green')
+plot(htru_pca$x[,1:2], pch = 20, col = mycolor, xlab = "PC1", ylab = "PC2", main = "Plot for 2 Principal Component")
+```
+
+###Part 2.3-(a)-iii
+```{r}
+biplot(htru_pca)
+#Skewness and Kurtosis attributes are highly corelated because they have eigen vector in same direction .Same can be interpreted for "skewness.dm.snr" and "kurtosis.dm.snr" as well as for "Mean.dm.snr" and "std.dev.dm.snr".
+```
+
+###Part 2.3-(b)-(i)
+```{r}
+htru_scale<-scale(htru[,1:8])
+htru_km <- kmeans(htru_scale, centers = 2, nstart = 25)
+fviz_cluster(htru_km, data=htru_scale) 
+```
+
+###Part 2.3-(b)-ii
+```{r}
+#Graph (b)(i) and Graph (a)(ii) are similar because k-means will converge to the local optimal solution, whehn k=2, it is essentially equivalent to the first two principle components.
+```
+
+###Part 2.3-(b)-iii
+```{r}
+htru_km$size
+#The distribution of the observation 2 clusters are : 8847, 1153
+```
+
+###Part 2.3-(b)-iv
+```{r}
+cat(paste("The distribution of the classes in the HTRU2 dataset for class 0 is:",sum(htru$class == 0)))
+cat(paste("\nThe distribution of the classes in the HTRU2 dataset for class 1 is:",sum(htru$class == 1)))
+```
+
+###Part 2.3-(b)-v
+```{r}
+#From the observation of b(iii) and b(iv), Cluster 1 corresponds to the majority class i.e. Class 0 and Cluster 2 corresponds to the minority class i.e. Class 1
+```
+
+###Part 2.3-(b)-vi 
+```{r}
+obs = which(htru_km$cluster == 1)
+count <- 0
+for (i in 1:length(obs)) {
+  if (htru[obs[i], 9] == 0)
+    count = count + 1
+}
+count
+length(obs) - count
+#There are 8624 observations in the large cluster belongs to Class 0 and 223 Observations in the large cluster belongs to class 1
+```
+
+###Part 2.3-(b)-vii
+```{r}
+#Larger cluster represents to Class 0
+```
+
+###Part 2.3-(b)-viii
+```{r}
+clusplot(scale(htru), htru_km$cluster)
+#Variance explained by the clustering is 76.97%
+```
+
+###Part 2.3-(b)-ix
+```{r}
+distance_matrix <- dist(scale(htru[,1:8]))
+htru_km_stats <- fpc::cluster.stats(d=distance_matrix, clustering=htru_km$cluster)
+htru_km_stats$avg.silwidth
+
+#The Average silhouette width for both cluster is 0.6007
+```
+
+###Part 2.3-(b)-x
+```{r}
+htru_km_stats$clus.avg.silwidths
+#The Silhouette width for cluster 1 is 0.6592 and for cluster 2 is 0.1516
+#The cluster which has larger silhouette width is better
+```
+
+###Part 2.3-(c)
+```{r}
+htru_pca_km <- kmeans(htru_pca$x[, 1:2], centers = 2, nstart = 25)
+fviz_cluster(htru_pca_km, data = htru_pca$x[, 1:2])
+```
+
+###Part 2.3-(c)-i
+```{r}
+#From the observation of a(ii) and b(i) the graph is similar and consistent.
+```
+
+###Part 2.3-(c)-ii
+```{r}
+distance_matrix <- dist(htru_pca$x[, 1:2])
+htru_pca_km_stats <- fpc::cluster.stats(d=distance_matrix, clustering=htru_pca_km$cluster)
+htru_pca_km_stats$avg.silwidth
+#The average Silhouette width of both the clusters 0.6826
+```
+
+###Part 2.3-(c)-iii
+```{r}
+htru_pca_km_stats$clus.avg.silwidths
+#The Silhouette width for cluster 1 is 0.4489 and for cluster 2 is 0.7003
+#The cluster which has larger silhouette width is better
+```
+
+###Part 2.3-(c)-iv
+```{r}
+#Valus of c(ii) i.e. 0.6826 is better than value of b(ix) i.e. 0.6607 as well as value of c(iii) i.e. (0.4489, 0.7003) is better than the value of b(x) i.e. (0.6592,0.1516). From the result we can conclude that Average Silhouette widths of both the cluster is better for c(ii) and c(iii)
+```
+
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

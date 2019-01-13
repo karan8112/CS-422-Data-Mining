@@ -1,0 +1,279 @@
+---
+title: "CS 422"
+output: 
+  html_notebook:
+    toc: yes
+    toc_float: yes
+author: Karan Bhatiya
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*.
+
+## Homework 4
+### Due Date: saturday, December 2, 2018 11:59:59 PM Chicago Time
+
+
+##Part 2.1  Locality sensitive hashing 
+```{r}
+install.packages("textreuse")
+library(textreuse)
+library(stringr)
+library(stats)
+```
+```{r}
+getwd()
+files <- list.files("./hw4.movies", full.names = T)
+corpus <- TextReuseCorpus(files, tokenizer = tokenize_ngrams, n = 5, keep_tokens = TRUE)
+```
+###Part 2.1 (a)
+```{r}
+shingles_char <- NULL
+col <- length(corpus)
+for (i in 1:col){
+  shingles <- paste0("user",i)
+  ch_matrix <- tokens(corpus[[shingles]])
+  shingles_char <- c(shingles_char,ch_matrix)
+}
+rowcount <- length(unique(shingles_char))
+sprintf("Number of Columns are %d , and Rows are %d",col,  rowcount)
+
+```
+###Part 2.1 (b)
+```{r}
+shingle_20 <- paste0("user",20)
+d <- corpus[[shingle_20]]
+```
+###Part 2.1 (b)-i
+```{r}
+stringr::str_count(d,boundary(type = c("sentence")))
+no <- length(readLines(files[113]))
+sprintf("Total number of movies rated:%d",no)
+```
+###Part 2.1 (b)-ii
+```{r}
+head(d$tokens[1:5])
+```
+###Part 2.1 (c)
+```{r}
+pairs <- pairwise_candidates(pairwise_compare(corpus, jaccard_similarity))
+```
+
+
+```{r}
+pairs
+```
+
+###Part 2.1 (c)-i
+```{r}
+cat("\nPairs of users have a similarity score of at least 0.60 is : ", nrow(pairs[pairs$score >= .60, ]))
+```
+
+###Part 2.1 (c)-ii
+```{r}
+cat("\nPairs of users have a similarity score of at least 0.50 is : ", nrow(pairs[pairs$score >= .50, ]))
+```
+
+###Part 2.1 (c)-iii
+```{r}
+cat("\nPairs of users have a similarity score of at least 0.40 is : ", nrow(pairs[pairs$score >= .40, ]))
+```
+
+###Part 2.1 (c)-iv
+```{r}
+pairs[pairs$score >= .40,]
+```
+
+###Part 2.1 (d)-i
+```{r}
+lsh_probability(h=28, b=14, s=0.60)
+#the minimum number of minhash is 18 and LSH bands is 9 for probability 0.98
+```
+
+###Part 2.1 (d)-ii
+```{r}
+minhash <- minhash_generator(n=18, seed=100)
+corpus1 <- TextReuseCorpus(files, tokenizer = tokenize_ngrams, n = 5,
+                          minhash_func = minhash, keep_tokens = TRUE)
+head(corpus1[[shingle_20]]$minhashes[1:5])
+```
+
+###Part 2.1 (e)-i
+```{r}
+minhash <- minhash_generator(n=28, seed=100)
+corpus2 <- TextReuseCorpus(files, tokenizer = tokenize_ngrams, n = 5,
+                          minhash_func = minhash, keep_tokens = TRUE)
+buckets <- lsh(corpus2, bands = 14)
+candidates <- lsh_candidates(buckets)
+res <- lsh_compare(candidates, corpus2, jaccard_similarity)
+d <- nrow(res[res$score >= .60, ])
+print(d)
+m <- nrow(res[res$score >= .50, ])
+print(m)
+
+#no there is not any candidate pairs using LSH similarity in between 0.6 and 0.5, because the similarity score is much higher as there is not any user in between that score and the result of pairwaise coparision is a more rigid computation.
+```
+###Part 2.1 (e)-ii
+```{r}
+print(res[res$score >= .40, ])
+```
+###Part 2.1 (e)-iii
+```{r}
+#Yes the abive and the the result of c(iv) are same.
+```
+
+###Part 2.1 (e)-iv
+```{r}
+#Total number of comparision in c : 224785
+#total number of comparision in e : 1501
+#work saved : (224785-1,501/224785)*100 = 99.33%
+```
+
+##Part 2.2 Content Based Recommendation System
+```{r}
+#take your illinois id
+x <- 20424290 %% 671
+paste("user", x)
+```
+```{r}
+movies_data <- read.csv("./movies.csv",header = TRUE,sep = ",")
+user_data <- read.csv("./ratings.csv",header = TRUE,sep = ",")
+movies_data <- data.frame(lapply(movies_data, as.character),stringsAsFactors = FALSE)
+user_data <- data.frame(lapply(user_data, as.character),stringsAsFactors = FALSE)
+user392 <- subset(user_data,user_data$userId==392)
+print(user392)
+
+
+generes <- c("Movie id","Action","Adventure","Animation","Children","Comedy","Crime","Documentary","Drama","Fantasy","Film-Noir","Horror","IMAX","Musical","Mystery","Romance","Sci-Fi","Thriller","War","Western","No Genres unlisted")
+
+
+user_profile <- matrix(as.numeric(0),nrow = 26,ncol = 21)
+
+colnames(user_profile) <- factor(genres)
+user_profile[26,1] <- "AVG"
+
+movies_list <- movies_data[which(movies_data$movieId %in% user392$movieId),]
+rownames(movies_list) <- 1:25
+
+
+for (i in 1:25) {
+  user_profile[i,1] <- movies_list[i,1]
+    list_generes_of_movie <- unlist(strsplit(movies_list[i,]$genres,split="[|]"))
+    for (k in 1:length(list_generes_of_movie)){
+      user_profile[i,list_generes_of_movie[k]] <- as.numeric(1)
+    }
+}
+
+print(user_profile[1:25,2])
+
+for(j in 2:21){
+  user_profile[26,j] <- mean(as.numeric(user_profile[1:25,j]))
+}
+
+write.csv(user_profile,file = "userprofile_392.csv",sep = ",")
+userprofile <- read.csv("userprofile_392.csv",sep = ",",stringsAsFactors = FALSE)
+print(userprofile)
+
+```
+
+```{r}
+set.seed(100)
+movies <- read.csv("./movies.csv", header=T, sep=",")
+movies <- data.frame(lapply(movies, as.character),stringsAsFactors = FALSE)
+random_sample <- sample(1:nrow(movies), 10, replace = FALSE)
+random_movie_sample <- movies[random_sample, ]
+rownames(random_movie_sample) <- 1:10
+random_movie_sample$movieId
+```
+
+```{r}
+
+
+movie_profile <- matrix(as.numeric(0),nrow = 10,ncol = 21)
+colnames(movie_profile) <- factor(generes)
+
+for (i in 1:10) {
+  movie_profile[i,1] <- random_movie_sample[i,1]
+    list_generes_of_movie <- unlist(strsplit(movies_list[i,]$genres,split="[|]"))
+    for (k in 1:length(list_generes_of_movie)){
+      movie_profile[i,list_generes_of_movie[k]] <- as.numeric(1)
+    }
+}
+
+print(movie_profile)
+
+```
+
+```{r}
+uservector <- user_profile[26,2:21]
+cosinesimilarity <- function(x, y) {
+sum(x*y)/(norm(x, type="2") * norm(y, type="2"))
+}
+
+movie_profile <- cbind(movie_profile,c(1,1,1,1,1,1,1,1,1,1))
+
+for (i in 1:10){
+cosine <- c(cosinesimilarity(as.numeric(uservector),as.numeric(movie_profile[i,2:21])))
+movie_profile[i,22] <- cosine 
+}
+print(movie_profile)
+
+```
+```{r}
+options(digits=3) 
+movies_recommended <- movie_profile[order(movie_profile[,22]),]
+cat("User ID 392 the following 5 movies are recommended : " , "\n")
+for (m in 10:6){
+top_movie <- which(movies$movieId == movies_recommended[m,1])
+ 
+  cat((movies[top_movie,1]) ,"\t" ,(movies[top_movie, 2]),"\t" , format(round(as.numeric(movies_recommended[m,22]),3)), "\n")
+}
+```
+
+##Part 2.3 Collaborative Filtering
+```{r}
+u191 <- c(which(res$a == "user191"))
+print(u191)
+u191 <- c(u191,c(which(res$b == "user191")))
+
+short <- res[u191,]
+tim <- short[order(-short$score),]
+print(tim)
+```
+###Part 2.3-(a) User-User Similarity
+```{r}
+user191_data <- subset(user_data,user_data$userId==191)
+row.names(user191_data) <- 1:length(as.numeric(user191_data$movieId))
+
+print(user191_data)
+test <- head(user191_data)
+for (i in 1:6){
+  user191_data[i,3] <- NA
+}
+print(user191_data)
+
+neighbours_191 <- c("225","317","415","50","568") 
+ros <- c("191",neighbours_191)
+user225 <- subset(user_data,user_data$userId==225)
+user317 <- subset(user_data,user_data$userId==317)
+user415 <-subset(user_data,user_data$userId==415)
+user50 <- subset(user_data,user_data$userId==50)
+user568 <-subset(user_data,user_data$userId==568)
+utility <- matrix(as.numeric(0),nrow = 6,ncol = 27)
+
+movie_list <- intersect(user191_data$movieId,user225$movieId)
+movie_list <- c(unique(movie_list),intersect(user191_data$movieId,user415$movieId))
+movie_list <- c(unique(movie_list),intersect(user191_data$movieId,user50$movieId))
+movie_list <- c(unique(movie_list),intersect(user191_data$movieId,user568$movieId))
+movie_list <- c(unique(movie_list),intersect(user191_data$movieId,user317$movieId))
+movie_list <- unique(movie_list)
+print(movie_list)
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
